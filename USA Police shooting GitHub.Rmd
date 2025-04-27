@@ -1,0 +1,113 @@
+---
+title: "Bevezetés az R-be: Beadandó feladat"
+author: "Béres Nándor"
+date: "2024-12-14"
+output:
+  html_document:
+    theme: cerulean
+---
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+### Csomagok betöltése
+
+library(tidyverse)
+library(spData)
+library(ggrepel)
+library(sf)
+
+### Adattáblák betöltése, adattáblák forrásai
+
+setwd('C:/Users/user/Documents')
+
+data <- read_csv("police_shootings_wp.csv") #forrás: https://github.com/washingtonpost/data-police-shootings/tree/master
+us_state_pop <- read_csv("US_census_pop_data.csv") #forrás: https://www.census.gov/quickfacts/fact/table/ND,US/PST045223
+us_state_codes <- read_csv2("us_state_codes.csv") # forrás: https://docs.google.com/spreadsheets/d/14wvnQygIX1eCVo7H5B7a96W1v5VCg6Q9yeRoESF6epw/edit?gid=0#gid=0
+gun_ownership <- read_csv2("gun_ownership.csv") #forrás: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4109494
+us_state_coordinates <- us_states[,c(2,7)] #térképkoordináták
+
+
+### Adattáblák átalakítása
+
+us_state_pop %>%
+  select(2:18) %>%
+  mutate(state = str_to_title(state)) %>%
+  rename(region = state) -> us_state_pop
+
+data %>%
+  left_join(., us_state_codes, by = c("state")) %>%
+  rename(region = name.y) %>%
+  mutate(region = str_to_title(region)) -> data
+
+```
+## Rendőrök által elkövetett halálos lövöldözések az USA-ban
+
+Projektfeladatom során az USA-ban 2015 és 2024 között történt, rendőrök által elkövetett halálos lövöldözésekhez készítettem vizualizációkat a ggplot csomag segítségével. Az adatbázist az amerikai New York Times hírlap gyűjti és folyamatosan frissíti. A halálesekről rendelkezésre áll annak ideje, helyszíne, valamint az áldozat életkora, neme, rassza és néhány további jellemzője. 10 év alatt összesen `r nrow(data)` esetet rögzítettek. Az USA államainak népességi, gazdasági adatai a 2020-as amerikai népszámlálás alapján adtam meg.
+
+
+```{r, echo=FALSE}
+### Havi szintű esetszámok
+data %>%
+  mutate(yyyymm = format(date, "%Y-%m")) %>%
+  group_by(yyyymm) %>%
+  summarize(count = n()) %>%
+  filter(yyyymm != '2024-12') -> trend_month
+
+### Éves szintű esetszámok
+
+data %>%
+  mutate(year = year(date)) %>%
+  group_by(year) %>%
+  summarize(count = n()) -> trend_year
+
+```
+#### Hőtérkép
+
+Az alábbi hőtérképen az 1 millió lakosra jutó esetek számát ábrázoltam. Látható, hogy Új-Mexikó államban kiemelkedően magas az esetek száma, a legalacsonyabb esetszámok pedig jellemzően a közép-nyugati (midwestern) és északkeleti (northeastern) térségben történnek.
+
+```{r, echo=FALSE, fig.align='center'}
+### Hőtérkép készítése
+
+# 1000 főre jutó esetek száma, államonként
+data %>%
+  group_by(region) %>%
+  summarise(count = n()) %>%
+  left_join(., us_state_pop, by = "region") %>%
+  select(region, count, Population) %>%
+  mutate(cases_per_million = round((count/Population) * 1e6, 2)) %>%
+  select(region, cases_per_million) -> nr_of_cases_state
+
+# Térképkoordiánák táblázathoz fűzése, hosszabb nevű államok rövidítése
+us_state_coordinates %>%
+  mutate(region = str_to_title(NAME)) %>%
+  select(-NAME) %>%
+  left_join(., nr_of_cases_state, by = "region") %>%
+  mutate(region2 = case_when(region == "Delaware" ~ "DE",
+                   region == "New Hampshire" ~ "NH",
+                   region == "District Of Columbia" ~ "DC",
+                   region == "Connecticut" ~ "CT",
+                   region == "Rhode Island" ~ "RI",
+                   region == "Maryland" ~ "MD",
+                   region == "Vermont" ~ "VT",
+                   region == "Massachusetts" ~ "MA",
+                   .default = region))-> nr_of_cases_state
+
+# Hőtérkép elkészítése
+ggplot(nr_of_cases_state) +
+  geom_sf(aes(fill = cases_per_million), show.legend = FALSE) +
+  geom_sf_text(aes(label = region2), size = 2, vjust = -1, position = "dodge") +
+  geom_sf_text(aes(label = round(cases_per_million)), size = 2) +
+  scale_fill_distiller(direction = 2) +
+  theme_minimal() +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        panel.border = element_rect(color = "black", size = 0.5, fill = NA)) +
+  labs(title = "Number of cases in each state, per 1 million inhabitants")
+```
