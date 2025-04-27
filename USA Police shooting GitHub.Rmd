@@ -4,7 +4,7 @@ author: "Béres Nándor"
 date: "2024-12-14"
 output:
   html_document:
-    theme: cerulean
+    theme: journal
 ---
 <style>
 body {
