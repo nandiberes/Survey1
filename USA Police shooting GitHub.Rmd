@@ -103,11 +103,11 @@ ggplot(nr_of_cases_state) +
   geom_sf_text(aes(label = region2), size = 2, vjust = -1, position = "dodge") +
   geom_sf_text(aes(label = round(cases_per_million)), size = 2) +
   scale_fill_distiller(direction = 2) +
-  theme_minimal() +
+  theme_bw() +
   theme(axis.title.y = element_blank(),
         axis.title.x = element_blank(),
         axis.text.x = element_blank(),
         axis.text.y = element_blank(),
-        panel.border = element_rect(color = "black", size = 0.5, fill = NA)) +
+        panel.border = element_rect(color = "grey", size = 0.5, fill = NA)) +
   labs(title = "Number of cases in each state, per 1 million inhabitants")
 ```
